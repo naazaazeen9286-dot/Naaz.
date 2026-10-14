@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Naaz – Voice Assistant</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1b1340">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Hind:wght@400;600&family=Fraunces:opsz,wght@9..144,600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#1b1340;--bg2:#2a1f5c;--ink:#f1ecff;--mute:#a79fd0;--rose:#ff6b8b;--mint:#7fe0c3;--line:#3d3178;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+:root[data-theme="light"]{--bg:#f6f2ff;--bg2:#e8e0ff;--ink:#1b1340;--mute:#5e5690;--rose:#d6305a;--mint:#0f8f72;--line:#cfc4f5}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]):not([data-theme="light"]){--bg:#f6f2ff;--bg2:#e8e0ff;--ink:#1b1340;--mute:#5e5690;--rose:#d6305a;--mint:#0f8f72;--line:#cfc4f5}}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:Hind,system-ui,sans-serif;display:flex;flex-direction:column;max-width:560px;margin:0 auto;padding:0 18px}
+h1{font-family:Fraunces,Georgia,serif;font-size:2.4rem;margin:18px 0 0;letter-spacing:.01em}
+.sub{color:var(--mute);margin:2px 0 0}
+.stage{display:flex;flex-direction:column;align-items:center;padding:22px 0 14px}
+#orb{width:132px;height:132px;border-radius:50%;border:0;cursor:pointer;color:#fff;font-size:2.6rem;background:radial-gradient(circle at 35% 30%,#ff9db3,var(--rose) 60%,#a8264a);box-shadow:0 0 0 10px rgba(255,107,139,.14),0 0 0 22px rgba(255,107,139,.07)}
+#orb:focus-visible{outline:3px solid var(--mint);outline-offset:6px}
+#orb.on{animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{50%{box-shadow:0 0 0 18px rgba(255,107,139,.2),0 0 0 36px rgba(255,107,139,.08)}}
+@media (prefers-reduced-motion:reduce){#orb.on{animation:none}}
+#status{margin-top:18px;color:var(--mint);min-height:1.5em;text-align:center}
+.row{display:flex;gap:8px}
+#txt{flex:1;background:var(--bg2);border:1px solid var(--line);color:var(--ink);border-radius:12px;padding:12px;font:inherit;min-width:0}
+.go{background:var(--bg2);border:1px solid var(--line);color:var(--ink);border-radius:12px;padding:0 16px;font:inherit;cursor:pointer}
+#log{flex:1;overflow-y:auto;margin:14px 0;display:flex;flex-direction:column;gap:10px;min-height:120px}
+.m{max-width:88%;padding:10px 14px;border-radius:16px;line-height:1.45}
+.me{align-self:flex-end;background:var(--bg2);border:1px solid var(--line)}
+.ai{align-self:flex-start;border-left:3px solid var(--rose);padding-left:12px;border-radius:4px 16px 16px 4px}
+.ai a{color:var(--mint);font-weight:600}
+details{color:var(--mute);font-size:.92rem;margin-bottom:14px}
+summary{cursor:pointer}
+details p{margin:8px 0;line-height:1.5}
+</style>
+</head>
+<body>
+<h1>Naaz</h1>
+<p class="sub">Aapki voice assistant. Mic dabaiye aur boliye.</p>
+<div class="stage">
+<button id="orb" aria-label="Naaz se baat karein">🎙</button>
+<div id="status" role="status">Mic dabakar bolna shuru karein</div>
+<button class="go" id="wk" aria-pressed="false" style="margin-top:14px;padding:10px 18px">Hey Naaz mode: band</button>
+</div>
+<div id="log" aria-live="polite"></div>
+<div class="row"><input id="txt" placeholder="Ya yahan likhiye: “YouTube pe Arijit Singh”" aria-label="Command likhiye"><button class="go" id="send">Bhejo</button></div>
+<details><summary>Naaz kya kar sakti hai?</summary>
+<p>“Naaz, samay kya hai” · “aaj ki tarikh” · “5 minute ka timer” · “call 9876543210” · “WhatsApp 9876543210 hello” · “YouTube pe bhajan” · “Google pe Rajkot weather” · “Maps mein Rajkot station” · “Instagram kholo” · “note likho doodh lana hai” · “mere notes” · “joke sunao” · “aaj ki jankari” · “surah yasin kholo” · “ayat ul kursi” · “dua sunao” · “khane ke baad ki dua” · “namaz ka time”</p></details>
+<script>
+const $=id=>document.getElementById(id), log=$('log'), st=$('status'), orb=$('orb');
+let notes=[];try{notes=JSON.parse(localStorage.getItem('naaz-notes')||'[]')}catch(e){}
+const saveNotes=()=>{try{localStorage.setItem('naaz-notes',JSON.stringify(notes))}catch(e){}};
+function add(cls,html){const d=document.createElement('div');d.className='m '+cls;d.innerHTML=html;log.appendChild(d);log.scrollTop=log.scrollHeight}
+const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function say(t){add('ai',t);try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t.replace(/<[^>]+>/g,''));u.lang='hi-IN';speechSynthesis.speak(u)}catch(e){}}
+function openLink(url,label,speech){
+  add('ai',esc(speech)+' <a href="'+url+'" target="_blank" rel="noopener">'+esc(label)+'</a>');
+  try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(speech);u.lang='hi-IN';speechSynthesis.speak(u)}catch(e){}
+  try{window.open(url,'_blank')}catch(e){}
+}
+const apps={instagram:'https://www.instagram.com',whatsapp:'https://web.whatsapp.com',gmail:'https://mail.google.com',facebook:'https://www.facebook.com',youtube:'https://www.youtube.com',maps:'https://maps.google.com',twitter:'https://x.com',spotify:'https://open.spotify.com',amazon:'https://www.amazon.in',flipkart:'https://www.flipkart.com'};
+const jokes=['Teacher ne pucha: sabse tez kya chalta hai? Bachche ne kaha: WhatsApp pe afwah!','Mobile ne kaha: charge kar do. Main bola: abhi nahi, 1% pe bhi chal jaata hoon!'];
+function digits(s){return (s.match(/[\d\s+-]{7,}/)||[''])[0].replace(/[^\d+]/g,'')}
+const MN=['Muharram','Safar','Rabi-ul-Awwal','Rabi-ul-Aakhir','Jumada-ul-Awwal','Jumada-ul-Aakhir','Rajab','Shaban','Ramzan','Shawwal','Zil-Qada','Zil-Hijja'];
+const MI=['Muharram haram mahino mein se hai; 10 Muharram (Ashura) ka roza mustahab hai.','Safar ka mahina.','Rabi-ul-Awwal Nabi ﷺ ki wiladat ka mahina hai.','Rabi-ul-Aakhir ka mahina.','Jumada-ul-Awwal ka mahina.','Jumada-ul-Aakhir ka mahina.','Rajab haram mahino mein se ek hai.','Shaban Ramzan se pehle ka mahina hai; Nabi ﷺ is mein zyada roze rakhte the.','Ramzan roze, taraweeh aur Quran ka mahina hai.','Shawwal: 1 tarikh ko Eid-ul-Fitr hoti hai, uske baad 6 roze rakhna mustahab hai.','Zil-Qada haram mahino mein se hai.','Zil-Hijja Hajj ka mahina hai; 9 tarikh Arafa ka roza aur 10 ko Eid-ul-Adha hai.'];
+const WD=['Itwaar. Subah-shaam ke azkaar aur Quran ki tilawat ka mamool rakhiye.','Peer ka din. Is din roza rakhna sunnat hai.','Mangal. Zikr, istighfar aur durood ka mamool rakhiye.','Budh. Din ki shuruaat Bismillah se kijiye.','Jumeraat. Is din bhi sunnat roza rakha jata hai. Kal Jumma hai, Surah Kahf aur durood ka ehtemam kijiye.','Jumma Mubarak! Ghusl, saaf kapde, Surah Kahf padhna aur durood bhejna mustahab amal hain. Jumma ki namaz ada kijiye.','Hafta. Quran ka thoda hissa roz padhne ka irada kijiye.'];
+const SN=['fatiha','baqarah','imran','nisa','maidah','anam','araf','anfal','tawbah','yunus','hud','yusuf','rad','ibrahim','hijr','nahl','isra','kahf','maryam','taha','anbiya','hajj','muminun','nur','furqan','shuara','naml','qasas','ankabut','rum','luqman','sajdah','ahzab','saba','fatir','yasin','saffat','sad','zumar','ghafir','fussilat','shura','zukhruf','dukhan','jathiyah','ahqaf','muhammad','fath','hujurat','qaf','dhariyat','tur','najm','qamar','rahman','waqiah','hadid','mujadila','hashr','mumtahanah','saff','jumuah','munafiqun','taghabun','talaq','tahrim','mulk','qalam','haqqah','maarij','nuh','jinn','muzzammil','muddaththir','qiyamah','insan','mursalat','naba','naziat','abasa','takwir','infitar','mutaffifin','inshiqaq','buruj','tariq','ala','ghashiyah','fajr','balad','shams','layl','duha','sharh','tin','alaq','qadr','bayyinah','zalzalah','adiyat','qariah','takathur','asr','humazah','fil','quraysh','maun','kawthar','kafirun','nasr','masad','ikhlas','falaq','nas'];
+const AL={fateha:'fatiha',yaseen:'yasin',rehman:'rahman',ikhlaas:'ikhlas',baqara:'baqarah',kehf:'kahf',imraan:'imran'};
+const DU=[[/uth|jaag|subah|wake/,'Alhamdu lillahil-ladhi ahyana bada ma amatana wa ilayhin-nushur.','Shukr us Allah ka jisne sone ke baad humein jagaya, aur usi ki taraf lautna hai.'],[/sone|neend|raat|sleep/,'Allahumma bismika amutu wa ahya.','Ae Allah, tere hi naam se main marta (sota) aur jeeta (jaagta) hoon.'],[/(khane|khaane|khana).*(baad|bad)/,'Alhamdu lillahil-ladhi atamana wa saqana wa jaalana muslimin.','Shukr us Allah ka jisne humein khilaya, pilaya aur musalman banaya.'],[/khane|khaane|khana/,'Bismillah.','Allah ke naam se shuru karta hoon.'],[/masjid se|masjid ke bahar/,'Allahumma inni asaluka min fadlik.','Ae Allah, main tujhse tera fazl maangta hoon.'],[/masjid|dakhil/,'Allahummaf-tah li abwaba rahmatik.','Ae Allah, mere liye apni rehmat ke darwaze khol de.'],[/safar|sawari|travel/,'Subhanal-ladhi sakhkhara lana hadha wa ma kunna lahu muqrinin, wa inna ila rabbina lamunqalibun.','Paak hai wo jisne ise hamare kaam mein laga diya, hum ise qaabu mein nahi kar sakte the, aur hum apne Rab ki taraf lautne wale hain.'],[/ghar|nikal/,'Bismillahi tawakkaltu alallah, wa la hawla wa la quwwata illa billah.','Allah ke naam se, maine Allah par bharosa kiya; Allah ke bina na koi taaqat hai na koi zor.']];
+const cap=s=>s[0].toUpperCase()+s.slice(1);
+function hijri(){try{const p=new Intl.DateTimeFormat('en-u-ca-islamic-umalqura-nu-latn',{day:'numeric',month:'numeric',year:'numeric'}).formatToParts(new Date());const g=t=>+p.find(x=>x.type===t).value;return{d:g('day'),m:g('month'),y:g('year')}}catch(e){return null}}
+function hijriStr(){const h=hijri();return h?h.d+' '+MN[h.m-1]+' '+h.y:'abhi maloom nahi'}
+function today(){const h=hijri();let t=WD[new Date().getDay()];if(h){t+=' Aaj '+hijriStr()+' Hijri hai. '+MI[h.m-1];if(h.d>=13&&h.d<=15)t+=' Aaj Ayyam-e-Beez hai: har Hijri mahine ki 13, 14, 15 tarikh ko roza rakhna mustahab hai.';if(h.m===1&&h.d===10)t+=' Aaj Ashura hai.';if(h.m===10&&h.d===1)t+=' Eid Mubarak!';if(h.m===12&&h.d===9)t+=' Aaj Arafa ka din hai.';if(h.m===12&&h.d===10)t+=' Eid-ul-Adha Mubarak!';if(h.m===3&&h.d===12)t+=' Aaj 12 Rabi-ul-Awwal hai.'}return t+' Hijri tarikh Saudi calendar ke hisaab se hai, Hindustan mein chaand dikhne par 1 din ka farq ho sakta hai.'}
+function surah(q){
+  if(/kursi|कुर्सी/.test(q))return[2,255,'Ayat-ul-Kursi (Surah Baqarah, ayat 255)'];
+  const mm=q.match(/(^|\s)(\d{1,3})(\s|$)/);if(mm&&+mm[2]>=1&&+mm[2]<=114)return[+mm[2],0,'Surah '+cap(SN[mm[2]-1])];
+  const STOP=/^(quran|qur|an|sharif|shareef|surah|sura|surat|sureh|kholo|khol|sunao|padho|padh|dikhao|chalao|ki|ka|ke|ko|naaz|hey|al|at|ash|as|ad|adh|ar|az|e|mein|me|open|read|play|ayat|aayat)$/;
+  const w=q.replace(/[^a-z\s]/g,' ').split(/\s+/).filter(x=>x&&!STOP.test(x));
+  for(const x of w){const t=AL[x]||x;let i=SN.indexOf(t);if(i<0&&t.length>=4)i=SN.findIndex(s=>s.length>=4&&s.slice(0,4)===t.slice(0,4));if(i>=0)return[i+1,0,'Surah '+cap(SN[i])]}
+  return null}
+function islam(q){
+  if(/(namaz|namaaz|नमाज़|नमाज).*(time|waqt|samay|kab|टाइम)|(time|waqt|kab).*(namaz|namaaz)/.test(q)){openLink('https://www.google.com/search?q='+encodeURIComponent('namaz time today'),'Namaz ke waqt','Namaz ke waqt Google par dikhati hoon. Apne ilaake ki masjid ke waqt se bhi mila lijiye.');return true}
+  if(/(dua|doa|दुआ|दोआ)/.test(q)){let d=DU.find(x=>x[0].test(q));if(!d){const n=new Date();d=DU[Math.floor((n-new Date(n.getFullYear(),0,0))/864e5)%DU.length]}say('Dua: '+d[1]+' Matlab: '+d[2]+' Arabic ki tasdeeq kisi aalim ya mustanad kitab se zaroor kar lijiye.');return true}
+  if(/(quran|qur.an|sura|sureh|ayat|aayat|कुरान|क़ुरान|सूरह|सूरा)/.test(q)&&!/youtube|google/.test(q)){const r=surah(q);if(r){const u=r[1]?'https://quran.com/'+r[0]+'/'+r[1]:'https://quran.com/'+r[0];openLink(u,r[2]+' kholo',r[2]+' khol rahi hoon. Hindi tarjuma ke liye quran.com ki settings mein Hindi chun lijiye. Quran ka matan main khud nahi padhti, taaki koi galti na ho.')}else openLink('https://quran.com','Quran Sharif kholo','Quran Sharif khol rahi hoon. Kaunsi surah chahiye? Jaise boliye, Surah Yasin.');return true}
+  if(/(hijri|islamic|islami|इस्लामी|हिजरी|din ki|aaj ki jankari|aaj ka din|aaj kya|jankari)/.test(q)){say(today());return true}
+  return false}
+function handle(raw){
+  let q=raw.toLowerCase().trim().replace(/^(hey |hi |ok )?(naaz|naz|नाज़|नाज)[,\s]*/i,'');
+  add('me',esc(raw));
+  if(!q){say('Ji, boliye, main sun rahi hoon.');return}
+  let m;
+  if(islam(q))return;
+  if(/(samay|time|baje|टाइम|समय)/.test(q))return say('Abhi '+new Date().toLocaleTimeString('hi-IN',{hour:'numeric',minute:'2-digit'})+' ho rahe hain.');
+  if(/(tarikh|tareekh|date|aaj ki|तारीख)/.test(q))return say('Aaj '+new Date().toLocaleDateString('hi-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'})+' hai. Hijri tarikh '+hijriStr()+'.');
+  if((m=q.match(/(\d+)\s*(minute|min|मिनट|second|sec|सेकंड|घंटे|ghante|hour)/))){
+    const n=+m[1],u=m[2],ms=n*(/^(sec|second|सेकंड)/.test(u)?1000:/^(ghante|hour|घंटे)/.test(u)?3600000:60000);
+    setTimeout(()=>say('Aapka '+n+' '+u+' ka timer khatam ho gaya!'),ms);return say(n+' '+u+' ka timer shuru ho gaya.');
+  }
+  if(/(call|phone|फोन|कॉल|dial)/.test(q)&&digits(q).length>=7){const n=digits(q);return openLink('tel:'+n,'Call '+n,n+' ko call lagati hoon.')}
+  if(/whatsapp|व्हाट्सएप/.test(q)&&digits(q).length>=7){const n=digits(q).replace(/^\+/,'');const msg=q.replace(/[\d\s+-]{7,}/,'').replace(/whatsapp|pe|par|bhejo|message|msg|को|ko/g,'').trim();
+    return openLink('https://wa.me/'+(n.length===10?'91'+n:n)+(msg?'?text='+encodeURIComponent(msg):''),'WhatsApp kholo','WhatsApp message taiyaar hai.')}
+  if((m=q.match(/^(?:youtube|यूट्यूब)\s*(?:pe|par|mein|में|पर)?\s*(.+)/))||(m=q.match(/(.+?)\s*(?:youtube|यूट्यूब)\s*(?:pe|par|पर)?\s*(?:chalao|dikhao|sunao|search)?$/))&&m[1].length>1&&!/kholo/.test(q))
+    return openLink('https://www.youtube.com/results?search_query='+encodeURIComponent(m[1].replace(/(chalao|sunao|dikhao)/g,'')),'YouTube kholo',m[1].trim()+' YouTube pe dhoondh rahi hoon.');
+  if((m=q.match(/(?:maps|map|navigate|रास्ता|नक्शा)\s*(?:mein|me|में|pe|to|ka)?\s*(.+)/)))
+    return openLink('https://www.google.com/maps/search/'+encodeURIComponent(m[1]),'Maps kholo',m[1]+' ka rasta dikhati hoon.');
+  if((m=q.match(/(?:google|search|dhundo|khojo|गूगल)\s*(?:pe|par|mein|में|पर|karo)?\s*(.+)/)))
+    return openLink('https://www.google.com/search?q='+encodeURIComponent(m[1]),'Google kholo',m[1]+' ke liye search kar rahi hoon.');
+  if((m=q.match(/(?:note|नोट)\s*(?:likho|kar lo|karo|लिखो)\s*(.+)/))){notes.push(m[1]);saveNotes();return say('Note likh liya: '+m[1])}
+  if(/(mere notes|notes dikhao|notes sunao|नोट्स)/.test(q))return say(notes.length?'Aapke notes: '+notes.map((x,i)=>(i+1)+'. '+x).join(', '):'Abhi koi note nahi hai.');
+  if(/(kholo|open|खोलो|chalu)/.test(q)){for(const k in apps)if(q.includes(k))return openLink(apps[k],k+' kholo',k+' khol rahi hoon.')}
+  if(/joke|चुटकुला|hasao/.test(q))return say(jokes[Math.floor(Math.random()*jokes.length)]);
+  if(/(naam|name|kaun ho|कौन)/.test(q))return say('Main Naaz hoon, aapki personal assistant.');
+  if(/(salam|salaam|assalam|सलाम|अस्सलाम)/.test(q))return say('Walaikum assalam! Bataiye, kya karun?');
+  if(/(hello|hi|kaise ho)/.test(q))return say('Assalamu alaikum! Main Naaz hoon. Bataiye, kya karun?');
+  say('Yeh abhi mujhe nahi aata. Kuch aur try kijiye, jaise “samay kya hai” ya “YouTube pe bhajan”.');
+}
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition;let rec,live=false,wakeMode=false,mute=0,awaitUntil=0;
+const WAKE=/\b(naaz|naz|naaj|naj|nars)\b|नाज़|नाज/;
+try{const _sp=speechSynthesis.speak.bind(speechSynthesis);speechSynthesis.speak=u=>{if(!speechSynthesis.getVoices().some(v=>/^hi/i.test(v.lang)))u.lang='en-IN';u.onstart=()=>{mute=1e15};u.onend=u.onerror=()=>{mute=Date.now()+700};_sp(u)}}catch(e){}
+if(SR){rec=new SR();rec.lang='hi-IN';rec.interimResults=true;
+  rec.onstart=()=>{live=true;orb.classList.add('on');st.textContent='Sun rahi hoon…'};
+  rec.onresult=e=>{const r=e.results[e.results.length-1];const t=r[0].transcript;
+    if(!wakeMode){st.textContent=t;if(r.isFinal)handle(t);return}
+    if(!r.isFinal||Date.now()<mute)return;
+    const l=t.toLowerCase();
+    if(WAKE.test(l)){const c=l.replace(WAKE,' ').replace(/\b(hey|hi|ok|okay)\b|हे/g,' ').trim();if(c)handle(c);else{awaitUntil=Date.now()+8000;say('Ji, boliye.')}}
+    else if(Date.now()<awaitUntil){awaitUntil=0;handle(l)}
+  };
+  rec.onerror=e=>{if(e.error==='not-allowed'){wakeMode=false;setW()}if(wakeMode&&(e.error==='no-speech'||e.error==='aborted'))return;st.textContent=/not-allowed/.test(e.error)?'Mic block hai ('+e.error+'). Permission dijiye ya naya link kholiye.':'Awaaz nahi pakad payi ('+e.error+'). Dobara try kijiye.'};
+  rec.onend=()=>{live=false;orb.classList.remove('on');if(wakeMode){st.textContent='“Hey Naaz” bolkar bulaiye';setTimeout(()=>{if(wakeMode)try{rec.start()}catch(e){}},300);return}if(/Sun rahi/.test(st.textContent))st.textContent='Mic dabakar bolna shuru karein'};
+  orb.onclick=()=>{try{live?rec.stop():rec.start()}catch(e){}};
+}else{orb.onclick=()=>{st.textContent='Is browser mein mic support nahi hai. Chrome use kijiye ya likh kar bhejiye.'}}
+const send=()=>{const v=$('txt').value;if(v.trim()){handle(v);$('txt').value=''}};
+$('send').onclick=send;
+const wk=$('wk');function setW(){wk.textContent='Hey Naaz mode: '+(wakeMode?'chalu':'band');wk.setAttribute('aria-pressed',wakeMode)}
+wk.onclick=()=>{if(!SR){st.textContent='Is browser mein mic support nahi hai. Chrome use kijiye.';return}wakeMode=!wakeMode;setW();try{if(wakeMode){say('Hey Naaz mode chalu. Mujhe Naaz kehkar bulaiye.');rec.start()}else{rec.stop();st.textContent='Mic dabakar bolna shuru karein'}}catch(e){}};$('txt').onkeydown=e=>{if(e.key==='Enter')send()};
+if('serviceWorker' in navigator){try{navigator.serviceWorker.register('sw.js')}catch(e){}}
+say('Assalamu alaikum! Main Naaz hoon. Mic dabaiye aur boliye.');
+</script>
+</body>
+</html>
